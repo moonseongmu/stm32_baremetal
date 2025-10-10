@@ -1,5 +1,4 @@
 *.bin
 *.hex
 *.elf
-CMSIS/
 .vscode/

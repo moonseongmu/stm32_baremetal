@@ -1,0 +1,6 @@
+pack:
+ - 'C:\Users\Moon Seongmu\Documents\Programming\cmsis_packs\Keil.STM32F4xx_DFP.3.1.1.pack'
+
+probes:
+ 07000001006500224a0000124e594d48a5a5a5a597969908:
+  target_override:  stm32f411ceux
