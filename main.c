@@ -33,6 +33,9 @@ int main(void)
 
 void clock_setup(void)
 {
+    //set flash latency to ws3
+    FLASH->ACR |= FLASH_ACR_LATENCY_3WS;
+    while((FLASH->ACR & FLASH_ACR_LATENCY_3WS) != 0x3){asm("nop");}
     //power interface clock enable 
     RCC->APB1ENR |= RCC_APB1ENR_PWREN;
     asm("nop"); //delay 1+ppre1 cycles as per errata
@@ -78,6 +81,6 @@ void clock_setup(void)
 
     //select pll as system clock
     RCC->CFGR |= RCC_CFGR_SW_PLL;
-    SystemCoreClockUpdate(); //the and bitwise operation is broken?S
 
+    SystemCoreClockUpdate(); //the and bitwise operation is broken?S
 }
