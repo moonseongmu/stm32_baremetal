@@ -3,6 +3,8 @@
 #include "main.h"
 
 uint32_t ticks;
+uint32_t button_timestamp;
+uint32_t button_expiration = 30; //button blocking time in ms
 int button_pressed = 0;
 
 int main(void){
@@ -17,6 +19,7 @@ int main(void){
     asm("nop"); //delay for 2 cycles as per errata sheet
     asm("nop");
 
+    //enable syscfg clock
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
     asm("nop"); //delay 1+ppre1 cycles as per errata
     asm("nop");
@@ -36,32 +39,13 @@ int main(void){
     SysTick_Config(100000);
     __enable_irq();
 
-    //select pa0 as exti0 input
-    SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI0_PA;
-
-    //unmask interrupt line 0 
-    EXTI->IMR |= EXTI_IMR_MR0;
-
-    //set falling edge detection on line 0
-    EXTI->FTSR |= EXTI_FTSR_TR0;
-
-    //set EXRI0 priotrity to 15(lowest) and exnables the interrupt line
-    NVIC_SetPriority(EXTI0_IRQn, 15);
-    NVIC_EnableIRQ(EXTI0_IRQn);
+    button_debounce();
     
-    //todo: button debouncing
     while (1){
         if(button_pressed != 0){
             GPIOC->ODR ^= GPIO_ODR_OD13;
             button_pressed = 0;
         }
-
-        /* //toggle pc13 on
-        GPIOC->ODR |= GPIO_ODR_OD13; 
-        delay_ms(1000);
-        //toggle PC13 on
-        GPIOC->ODR &= ~GPIO_ODR_OD13; 
-        delay_ms(1000); //*/
     }
     
 }
@@ -119,10 +103,6 @@ void clock_setup(void){
     SystemCoreClockUpdate();
 }
 
-void SysTick_Handler(){
-    ticks++;
-}
-
 void delay_ms(uint32_t millisecs){
     uint32_t start = ticks;
     uint32_t end = start + millisecs;
@@ -134,11 +114,58 @@ void delay_ms(uint32_t millisecs){
     while (ticks < end){asm("nop");}
 }
 
+void button_debounce(void){
+    //select pa0 as exti0 input
+    SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI0_PA;
+
+    //unmask interrupt line 0 
+    EXTI->IMR |= EXTI_IMR_MR0;
+
+    //set falling edge detection on line 0
+    EXTI->FTSR |= EXTI_FTSR_TR0;
+
+    NVIC_EnableIRQ(EXTI0_IRQn);
+    button_timer_init();
+}
+
+
+void button_timer_init(void){
+    RCC->APB2ENR |= RCC_APB2ENR_TIM10EN; //enable timer 10
+    asm("nop"); //delay 1+ppre1 cycles as per errata
+    asm("nop");
+    asm("nop");
+
+    TIM10->CR1 |= TIM_CR1_CEN; //enable counter
+    TIM10->CR1 |= TIM_CR1_URS; //only counter overflow generates interrupt
+    TIM10->DIER |= TIM_DIER_UIE; //update interrupt enable
+    TIM10->PSC = 9999; //prescaler 9999 to bring 100Mhz down to 10khz
+    TIM10->ARR = 100; //autoreload register to trigger overflow interrupt every 10ms
+    NVIC_EnableIRQ(TIM1_UP_TIM10_IRQn); //enable timer interrupt
+
+}
+
+void SysTick_Handler(){
+    ticks++;
+}
+
+void TIM1_UP_TIM10_IRQHandler(void){
+    TIM10->SR &= ~TIM_SR_UIF; //clear update interrupt flag
+
+    if ((ticks - button_timestamp) < button_expiration){ //if blocker is active
+        if ((GPIOA->IDR & 1) != 1){ //check if pa0 pressed down
+            button_timestamp = ticks;
+        }
+    }
+}
+
 void EXTI0_IRQHandler(void){
     //clear exti0 pending register bit
     EXTI->PR |= EXTI_PR_PR0;
-
-    //set button pressed flag
-    button_pressed = 1;
-
+    
+    if ((ticks - button_timestamp) > button_expiration){
+        button_timestamp = ticks;
+        //set button pressed flag
+        button_pressed = 1;
+    }
 }
+
