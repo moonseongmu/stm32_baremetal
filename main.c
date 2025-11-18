@@ -49,6 +49,7 @@ int main(void){
     NVIC_SetPriority(EXTI0_IRQn, 15);
     NVIC_EnableIRQ(EXTI0_IRQn);
     
+    //todo: button debouncing
     while (1){
         if(button_pressed != 0){
             GPIOC->ODR ^= GPIO_ODR_OD13;
