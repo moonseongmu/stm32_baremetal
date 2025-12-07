@@ -1,5 +1,6 @@
 void clock_setup(void);
 void peripheral_init(void);
+void uart_init(uint32_t baud);
 void delay_ms(uint32_t millisecs);
 void SysTick_Handler();
 void button_debounce(void);

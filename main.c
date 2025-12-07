@@ -14,13 +14,14 @@ int main(void){
     SysTick_Config(100000);
     __enable_irq();
 
-    char letter = 'e';
+    char letter = 't';
     while (1){
         while(((USART1->SR & USART_SR_TC_Msk) >> USART_SR_TC_Pos) != 1){
             asm("nop");
         }
 
         USART1->DR = letter;
+        delay_ms(10);
     }
     
 }
@@ -91,6 +92,10 @@ void peripheral_init(void){
     asm("nop");
     asm("nop");
 
+    uart_init(115200);
+}
+
+void uart_init(uint32_t baud){
     //enable usart1 clock
     RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
     asm("nop"); //delay 1+ppre1 cycles as per errata
@@ -113,8 +118,10 @@ void peripheral_init(void){
     //set number of stop bit to 1
     USART1->CR2 &= ~USART_CR2_STOP_Msk;
     //set baud to 11520
-    USART1->BRR |= (54 << USART_BRR_DIV_Mantissa_Pos);
-    USART1->BRR |= (4 << USART_BRR_DIV_Fraction_Pos);
+    uint32_t mantissa =  SystemCoreClock / (16 * baud);
+    uint32_t fraction = (SystemCoreClock / baud) % 16;
+    USART1->BRR |= (mantissa << USART_BRR_DIV_Mantissa_Pos);
+    USART1->BRR |= (fraction << USART_BRR_DIV_Fraction_Pos);
 
     //set transmitter enable bit to send idle frame as first transmission
     USART1->CR1 |= USART_CR1_TE;
