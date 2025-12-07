@@ -9,43 +9,18 @@ int button_pressed = 0;
 
 int main(void){
     clock_setup();
-    //enable GPIOC clock
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN; 
-    asm("nop"); //delay for 2 cycles as per errata sheet
-    asm("nop");
-
-    //enable GPIOA clock
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; 
-    asm("nop"); //delay for 2 cycles as per errata sheet
-    asm("nop");
-
-    //enable syscfg clock
-    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-    asm("nop"); //delay 1+ppre1 cycles as per errata
-    asm("nop");
-    asm("nop");
-
-    
-    //set mode as output for pc13
-    GPIOC->MODER |= GPIO_MODER_MODER13_0; 
-
-    //set mode as input for interrupt for pa0
-    GPIOA->MODER &= ~GPIO_MODER_MODER0_Msk; 
-
-    //set pa0 to pull up
-    GPIOA->PUPDR |= GPIO_PUPDR_PUPD0_0;
-
+    peripheral_init();
 
     SysTick_Config(100000);
     __enable_irq();
 
-    button_debounce();
-    
+    char letter = 'e';
     while (1){
-        if(button_pressed != 0){
-            GPIOC->ODR ^= GPIO_ODR_OD13;
-            button_pressed = 0;
+        while(((USART1->SR & USART_SR_TC_Msk) >> USART_SR_TC_Pos) != 1){
+            asm("nop");
         }
+
+        USART1->DR = letter;
     }
     
 }
@@ -103,6 +78,48 @@ void clock_setup(void){
     SystemCoreClockUpdate();
 }
 
+void peripheral_init(void){
+
+    //enable GPIOA clock
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; 
+    asm("nop"); //delay for 2 cycles as per errata sheet
+    asm("nop");
+
+    //enable syscfg clock
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+    asm("nop"); //delay 1+ppre1 cycles as per errata
+    asm("nop");
+    asm("nop");
+
+    //enable usart1 clock
+    RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+    asm("nop"); //delay 1+ppre1 cycles as per errata
+    asm("nop");
+    asm("nop");
+
+    //set mode as alternate function for pb6 (usart1 TX)
+    GPIOB->MODER |= GPIO_MODER_MODER6_1; 
+    //set mode as alternate function for pb7 (usart1 RX)
+    GPIOB->MODER |= GPIO_MODER_MODER7_1;
+    //set alternatfe function for pb6 to af7
+    GPIOB->AFR[0] |= (7 << GPIO_AFRL_AFSEL6_Pos); 
+    //set alternatfe function for pb7 to af7
+    GPIOB->AFR[0] |= (7 << GPIO_AFRL_AFSEL7_Pos);
+
+    //uart enable
+    USART1->CR1 |= USART_CR1_UE;
+    //set word length to 9
+    USART1->CR1 |= USART_CR1_M;
+    //set number of stop bit to 1
+    USART1->CR2 &= ~USART_CR2_STOP_Msk;
+    //set baud to 11520
+    USART1->BRR |= (54 << USART_BRR_DIV_Mantissa_Pos);
+    USART1->BRR |= (4 << USART_BRR_DIV_Fraction_Pos);
+
+    //set transmitter enable bit to send idle frame as first transmission
+    USART1->CR1 |= USART_CR1_TE;
+}
+
 void delay_ms(uint32_t millisecs){
     uint32_t start = ticks;
     uint32_t end = start + millisecs;
@@ -114,58 +131,7 @@ void delay_ms(uint32_t millisecs){
     while (ticks < end){asm("nop");}
 }
 
-void button_debounce(void){
-    //select pa0 as exti0 input
-    SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI0_PA;
-
-    //unmask interrupt line 0 
-    EXTI->IMR |= EXTI_IMR_MR0;
-
-    //set falling edge detection on line 0
-    EXTI->FTSR |= EXTI_FTSR_TR0;
-
-    NVIC_EnableIRQ(EXTI0_IRQn);
-    button_timer_init();
-}
-
-
-void button_timer_init(void){
-    RCC->APB2ENR |= RCC_APB2ENR_TIM10EN; //enable timer 10
-    asm("nop"); //delay 1+ppre1 cycles as per errata
-    asm("nop");
-    asm("nop");
-
-    TIM10->CR1 |= TIM_CR1_CEN; //enable counter
-    TIM10->CR1 |= TIM_CR1_URS; //only counter overflow generates interrupt
-    TIM10->DIER |= TIM_DIER_UIE; //update interrupt enable
-    TIM10->PSC = 9999; //prescaler 9999 to bring 100Mhz down to 10khz
-    TIM10->ARR = 100; //autoreload register to trigger overflow interrupt every 10ms
-    NVIC_EnableIRQ(TIM1_UP_TIM10_IRQn); //enable timer interrupt
-
-}
-
 void SysTick_Handler(){
     ticks++;
-}
-
-void TIM1_UP_TIM10_IRQHandler(void){
-    TIM10->SR &= ~TIM_SR_UIF; //clear update interrupt flag
-
-    if ((ticks - button_timestamp) < button_expiration){ //if blocker is active
-        if ((GPIOA->IDR & 1) != 1){ //check if pa0 pressed down
-            button_timestamp = ticks;
-        }
-    }
-}
-
-void EXTI0_IRQHandler(void){
-    //clear exti0 pending register bit
-    EXTI->PR |= EXTI_PR_PR0;
-    
-    if ((ticks - button_timestamp) > button_expiration){
-        button_timestamp = ticks;
-        //set button pressed flag
-        button_pressed = 1;
-    }
 }
 
