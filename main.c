@@ -118,8 +118,8 @@ void uart_init(uint32_t baud){
     //set number of stop bit to 1
     USART1->CR2 &= ~USART_CR2_STOP_Msk;
     //set baud to 11520
-    uint32_t mantissa =  SystemCoreClock / (16 * baud);
-    uint32_t fraction = (SystemCoreClock / baud) % 16;
+    uint16_t mantissa =  SystemCoreClock / (16 * baud);
+    uint8_t fraction = (SystemCoreClock / baud) % 16;
     USART1->BRR |= (mantissa << USART_BRR_DIV_Mantissa_Pos);
     USART1->BRR |= (fraction << USART_BRR_DIV_Fraction_Pos);
 
