@@ -1,4 +1,5 @@
 #include <sys/stat.h>
+#include <sys/times.h>
 #include <errno.h>
 #include "uart.h"
 #undef errno

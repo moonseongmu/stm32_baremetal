@@ -1,5 +1,5 @@
 CC := arm-none-eabi-gcc
-CFLAGS := -o out.elf -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -Wall -Wextra -g -Og -specs=nano.specs
+CFLAGS := -o out.elf -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -Wall -Wextra -Werror -g -Og -specs=nano.specs
 CSOURCES := ./main.c ./syscalls.c ./uart.c ./CMSIS/Device/Source/system_stm32f4xx.c ./CMSIS/Device/Source/startup_stm32f411xe.s
 CINCLUDE := -I./CMSIS/Core/Include -I./CMSIS/Core/Include/m-profile -I./CMSIS/Device/Include
 LINK := -T ./linkerscript_gcc.ld
